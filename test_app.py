@@ -1,8 +1,15 @@
 from app import app
 
 
-def test_home():
-    client = app.test_client()
-    response = client.get('/')
+def test_home_endpoint():
+    response = app.test_client().get("/")
     assert response.status_code == 200
-    assert b'CI/CD and Docker Pipeline is a massive success! V2' in response.data
+    data = response.get_json()
+    assert data["status"] == "success"
+    assert data["version"] == "v1"
+
+
+def test_health_endpoint():
+    response = app.test_client().get("/health")
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "healthy"}
