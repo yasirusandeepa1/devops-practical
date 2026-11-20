@@ -1,5 +1,7 @@
 # DevOps Practical – Flask Application
 
+Docker Hub publishing is enabled through GitHub Actions repository settings.
+
 This repository demonstrates six DevOps practical phases: application development, GitHub Actions CI, Docker containerization, Kubernetes deployment, Kubernetes self-healing, and continuous deployment with Render.
 
 ## Project structure
