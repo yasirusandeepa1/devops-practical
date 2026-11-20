@@ -1,131 +1,102 @@
 # DevOps Practical – Flask Application
 
-This project contains the source files for the six phases in the supplied DevOps practical: local development and Git, GitHub Actions CI, Docker, Kubernetes, the Kubernetes self-healing demonstration, and Render deployment.
+This repository demonstrates six DevOps practical phases: application development, GitHub Actions CI, Docker containerization, Kubernetes deployment, Kubernetes self-healing, and continuous deployment with Render.
 
 ## Project structure
 
 ```text
 devops-practical/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
+├── .github/workflows/ci.yml
 ├── k8s/
 │   ├── deployment.yaml
 │   └── service.yaml
 ├── .dockerignore
+├── .gitignore
 ├── Dockerfile
 ├── app.py
 ├── requirements.txt
 ├── test_app.py
+├── render.yaml
 └── README.md
 ```
 
-## Before you start
+## Phase 1 – Flask application
 
-Install Python, Git, Docker Desktop, kubectl and Minikube. Create your own GitHub and Docker Hub accounts. Replace `YOUR_DOCKERHUB_USERNAME` in `k8s/deployment.yaml` with your Docker Hub username before applying the Kubernetes Deployment.
-
-## Phase 1 – Run locally and push to GitHub
-
-Open Command Prompt in this folder and run:
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-pytest
-python app.py
-```
-
-Open http://localhost:5000. Stop the server with Ctrl+C.
-
-Create an empty GitHub repository named `devops-practical`, then run (replace the URL with your own repository URL):
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: Flask app and tests"
-git branch -M main
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/devops-practical.git
-git push -u origin main
-```
-
-If Git asks who you are, configure your commit identity:
-
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "YOUR_EMAIL_ADDRESS"
-```
+- `/` returns application status and version as JSON.
+- `/health` returns a health-check response.
+- Dependencies are listed in `requirements.txt`.
+- Automated tests are in `test_app.py`.
 
 ## Phase 2 – GitHub Actions CI
 
-The workflow is at `.github/workflows/ci.yml`. Push it to the `main` branch. In GitHub, open the repository's **Actions** tab and check that **CI Pipeline** completes successfully.
+The workflow at `.github/workflows/ci.yml` runs on pushes and pull requests to `main`. It installs Python 3.11 dependencies, runs pytest, and builds the Docker image.
 
 ## Phase 3 – Docker
 
-Start Docker Desktop and wait until it reports that the engine is running. From the project root:
+The `Dockerfile` packages the Flask app using Python 3.11 and Gunicorn.
 
-```bash
-docker build -t flask-app:v1 .
-docker run --rm -p 5000:5000 flask-app:v1
-```
+To publish to Docker Hub:
+1. Create a Docker Hub repository named `devops-practical` under account `kgysandeepa`.
+2. In GitHub repository Settings → Secrets and variables → Actions, add secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
+3. Add repository variable `DOCKERHUB_ENABLED` with value `true`.
 
-Open http://localhost:5000 and stop the container with Ctrl+C.
+The publish job is intentionally skipped until that variable is enabled, so the CI test/build workflow can pass without Docker Hub credentials. Never commit passwords or tokens.
 
-Log in to Docker Hub, tag and push the image (replace the username):
+## Phase 4 – Kubernetes deployment
 
-```bash
-docker login
-docker tag flask-app:v1 YOUR_DOCKERHUB_USERNAME/flask-app:v1
-docker push YOUR_DOCKERHUB_USERNAME/flask-app:v1
-```
+The manifests in `k8s/` deploy two replicas and expose the application with a NodePort Service.
 
-## Phase 4 – Kubernetes with Minikube
-
-Start Docker Desktop first, then:
+Prerequisites: Docker Desktop, kubectl, and Minikube. The image must first be published to Docker Hub.
 
 ```bash
 minikube start --driver=docker
-kubectl version --client
-minikube version
-```
-
-Edit `k8s/deployment.yaml` and replace `YOUR_DOCKERHUB_USERNAME` with your Docker Hub username. From the project root apply both manifests:
-
-```bash
+kubectl get nodes
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
-kubectl get pods -w
-```
-
-Wait until both Pods show `Running`, then press Ctrl+C and check:
-
-```bash
+kubectl rollout status deployment/devops-practical
 kubectl get pods
 kubectl get services
-minikube service flask-service
+minikube service devops-practical-service
 ```
 
-## Phase 5 – Kubernetes self-healing demonstration
+## Phase 5 – Kubernetes self-healing
 
-Get a Pod name and delete one Pod:
+List the application Pods:
 
 ```bash
-kubectl get pods
-kubectl delete pod POD_NAME_FROM_PREVIOUS_COMMAND
-kubectl get pods -w
+kubectl get pods -l app=devops-practical
 ```
 
-Kubernetes should create a replacement Pod to return to the Deployment's desired replica count of two. Capture your own terminal evidence for the practical demonstration.
+Delete one Pod, replacing `POD_NAME` with its actual name:
 
-## Phase 6 – Render deployment
+```bash
+kubectl delete pod POD_NAME
+kubectl get pods -l app=devops-practical -w
+```
 
-The application reads the `PORT` environment variable supplied by Render and defaults to port 5000 locally. Push the latest code to GitHub, then in Render create a **Web Service** connected to your repository. Select the `main` branch and Docker runtime (the Dockerfile is in the project root). Choose an available plan and region shown in your Render account. Wait for the deployment to become Live and test the generated public URL.
+The Deployment controller should create a replacement Pod and restore the desired replica count to two. Stop watching with Ctrl+C.
 
-To demonstrate a later change, edit the response string in `app.py`, update the matching expected text in `test_app.py`, then commit and push. Confirm the GitHub Actions workflow passes and Render deploys the new version.
+## Phase 6 – Continuous deployment with Render
 
-## Important notes
+The root-level `render.yaml` defines a Render web service. In Render, create a Blueprint and connect this GitHub repository. Render reads the configuration, builds the Flask application, and can automatically deploy updates from `main`.
 
-- Replace all uppercase placeholders such as `YOUR_GITHUB_USERNAME`, `YOUR_EMAIL_ADDRESS`, and `YOUR_DOCKERHUB_USERNAME` with your own details. Never share passwords or access tokens in this project.
-- The supplied practical uses pinned Flask/Pytest versions and Python 3.9 in CI and Docker to match its instructions.
-- These are prepared project files, not proof that the commands have been run. Run each phase on your laptop and take your own screenshots of successful tests, GitHub Actions, Docker, Kubernetes, and Render for any evidence your lecturer requires.
-- Render's free-plan availability and terms can change; select only a plan currently offered in your account.
+After deployment, verify:
+- `/` returns the application status JSON.
+- `/health` returns `{"status":"healthy"}`.
+
+## Run locally (optional)
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+pip install -r requirements.txt
+pytest -v
+python app.py
+```
+
+Open `http://localhost:5000`.
+
+## Deployment notes
+
+The source code and deployment configuration are committed here. Docker Hub publishing requires the repository and GitHub Actions secrets/variable described above. Kubernetes execution requires a running cluster and a published image. Render deployment requires connecting this repository to a Render account.
