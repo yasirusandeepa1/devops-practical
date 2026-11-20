@@ -102,3 +102,6 @@ Open `http://localhost:5000`.
 ## Deployment notes
 
 The source code and deployment configuration are committed here. Docker Hub publishing requires the repository and GitHub Actions secrets/variable described above. Kubernetes execution requires a running cluster and a published image. Render deployment requires connecting this repository to a Render account.
+
+
+<!-- Docker Hub publish trigger verification -->
